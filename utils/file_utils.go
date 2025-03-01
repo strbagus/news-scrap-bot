@@ -3,51 +3,47 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"gobot/models"
 	"io"
 	"os"
 )
 
-func ReadFile(path string) []models.NewsType {
+func ReadFile[T any](path string) ([]T, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		fmt.Println("Error opening file: ", err)
-		return nil
+		return nil, fmt.Errorf("error opening file: %w", err)
 	}
 	defer file.Close()
 
 	byteValue, err := io.ReadAll(file)
 	if err != nil {
-		fmt.Println("Error reading file: ", err)
-		return nil
+		return nil, fmt.Errorf("error reading file: %w", err)
 	}
 
-	var news []models.NewsType
-	err = json.Unmarshal(byteValue, &news)
+	var result []T
+	err = json.Unmarshal(byteValue, &result)
 	if err != nil {
-		fmt.Println("Error unmarshalling file: ", err)
-		return nil
+		return nil, fmt.Errorf("error unmarshalling file: %w", err)
 	}
-	return news
+
+	return result, nil
 }
 
-func WriteFile(path string, data []models.NewsType) {
+func WriteFile[T any](path string, data []T) error {
 	file, err := os.Create(path)
 	if err != nil {
-		fmt.Println("Error creating file: ", err)
-		return
+		return fmt.Errorf("error creating file: %w", err)
 	}
 	defer file.Close()
 
-	byteValue, err := json.Marshal(data)
+	byteValue, err := json.MarshalIndent(data, "", "  ") // Indented for readability
 	if err != nil {
-		fmt.Println("Error marshalling data: ", err)
-		return
+		return fmt.Errorf("error marshalling data: %w", err)
 	}
 
 	_, err = file.Write(byteValue)
 	if err != nil {
-		fmt.Println("Error writing data: ", err)
-		return
+		return fmt.Errorf("error writing data: %w", err)
 	}
+	return nil
 }
+
