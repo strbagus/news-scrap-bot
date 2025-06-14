@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -34,11 +35,12 @@ func GetData() []models.NewsType {
 	defer res.Body.Close()
 
 	doc, _ := goquery.NewDocumentFromReader(res.Body)
-	doc.Find(".event-post").Each(func(i int, s *goquery.Selection) {
-		title := s.Find("h3").Text()
-		link := s.Find("a").AttrOr("href", "")
+	doc.Find(".blog__post-content-two").Each(func(i int, s *goquery.Selection) {
+		title := s.Find("h2").Find("a").AttrOr("title", "")
+		link := s.Find("h2").Find("a").AttrOr("href", "")
 		news = append(news, models.NewsType{Title: title, Link: link})
 	})
+
 	return news
 }
 
@@ -55,5 +57,5 @@ func CompareData(oldData []models.NewsType, newData []models.NewsType) []models.
 			listNew = append(listNew, new)
 		}
 	}
-    return listNew
+	return listNew
 }
