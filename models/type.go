@@ -1,11 +1,11 @@
 package models
 
 type NewsType struct {
-	Title string
-	Link  string
+	Title string `bson:"title"`
+	Link  string `bson:"link"`
 }
 
 type User struct {
-    ChatID int64
-    Username string
+	ChatID   int64  `bson:"chatid"`
+	Username string `bson:"username"`
 }
