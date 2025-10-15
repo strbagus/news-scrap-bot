@@ -12,6 +12,7 @@ import (
 	tbmodels "github.com/go-telegram/bot/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func MenuSubscribe(ctx context.Context, b *bot.Bot, update *tbmodels.Update) {
@@ -65,14 +66,27 @@ func MenuUnsubscribe(ctx context.Context, b *bot.Bot, update *tbmodels.Update) {
 }
 
 func MenuLastInfo(ctx context.Context, b *bot.Bot, update *tbmodels.Update) {
-	news, _ := ReadFile[m.NewsType]("db/news.json")
-	message := fmt.Sprintf("%s\n%s", news[0].Title, news[0].Link)
-	chatID := update.Message.Chat.ID
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: chatID,
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	coll := db.Client.Database("ftibot").Collection("news")
+	opts := options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}})
+	var news m.NewsType 
+	err := coll.FindOne(ctxTimeout, bson.D{}, opts).Decode(&news)
+	if err != nil {
+		log.Printf("Error find last news: %v", err)
+	}
+	message := fmt.Sprintf("%s\n%s", news.Title, news.Link)
+	user := update.Message.Chat
+
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: user.ID,
 		Text:   message,
 	})
+
 	if err != nil {
 		log.Printf("Error sending last info message: %v", err)
+	} else {
+		log.Printf("INFO: Sent %v - %v", user.Username, news.Title)
 	}
 }

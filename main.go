@@ -14,6 +14,9 @@ import (
 	"github.com/go-telegram/bot"
 	tbmodels "github.com/go-telegram/bot/models"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func init() {
@@ -76,26 +79,65 @@ func startPeriodicTask(ctx context.Context, b *bot.Bot) {
 }
 
 func scrap(ctx context.Context, b *bot.Bot) {
-	list := utils.GetData()
-	users, _ := utils.ReadFile[models.User]("db/users.json")
-	oldList, _ := utils.ReadFile[models.NewsType]("db/news.json")
-	news := utils.CompareData(oldList, list)
-	if len(news) > 0 {
-		for _, user := range users {
-			for _, item := range news {
-				message := fmt.Sprintf("%s\n%s", item.Title, item.Link)
-				_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-					ChatID: user.ChatID,
-					Text:   message,
-				})
-				if err != nil {
-					log.Printf("Error sending news: %v", err)
+	dbc := db.Client.Database("ftibot")
+	cNews := dbc.Collection("news")
+	cUsers := dbc.Collection("users")
+
+	news := utils.GetData()
+	docs := make([]any, len(news))
+	for i, n := range news {
+		docs[i] = n
+	}
+	opts := options.InsertMany().SetOrdered(false)
+	res, err := cNews.InsertMany(context.Background(), docs, opts)
+
+	if err != nil {
+		if bwe, ok := err.(mongo.BulkWriteException); ok {
+			for _, e := range bwe.WriteErrors {
+				if e.Code != 11000 {
+					fmt.Printf("write error: %+v\n", e)
 				}
 			}
+		} else {
+			log.Fatalf("InsertMany failed: %v", err)
 		}
-        utils.WriteFile("db/news.json", list)
-	} else {
-		fmt.Println("No new data to send.")
+	}
+	ctxTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	usersCursor, err := cUsers.Find(ctxTimeout, bson.D{})
+	if err != nil {
+		log.Printf("ERROR: Get list users: %v", err)
+		return
+	}
+	defer usersCursor.Close(ctxTimeout)
+
+	for usersCursor.Next(ctxTimeout) {
+		var user models.User
+
+		if err := usersCursor.Decode(&user); err != nil {
+			log.Printf("ERROR: Decode user: %v", err)
+			continue
+		}
+
+		for i := range res.InsertedIDs {
+			news := news[i]
+
+			message := fmt.Sprintf("%s\n%s", news.Title, news.Link)
+			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: user.ChatID,
+				Text:   message,
+			})
+			if err != nil {
+				log.Printf("Error sending news: %v", err)
+			} else {
+				log.Printf("INFO: Sent %v - %v", user.Username, news.Title)
+			}
+		}
+
+	}
+
+	if err := usersCursor.Err(); err != nil {
+		log.Printf("Cursor error: %v", err)
 	}
 }
 
