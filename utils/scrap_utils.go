@@ -43,19 +43,3 @@ func GetData() []models.NewsType {
 
 	return news
 }
-
-func CompareData(oldData []models.NewsType, newData []models.NewsType) []models.NewsType {
-	listNew := []models.NewsType{}
-	for _, new := range newData {
-		isNewExist := false
-		for _, old := range oldData {
-			if old.Title == new.Title {
-				isNewExist = true
-			}
-		}
-		if !isNewExist {
-			listNew = append(listNew, new)
-		}
-	}
-	return listNew
-}
