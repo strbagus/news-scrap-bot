@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"gobot/db"
 	"gobot/models"
 	"gobot/utils"
 	"log"
@@ -23,6 +24,8 @@ func init() {
 }
 
 func main() {
+	db.InitMongo()
+	defer db.CloseMongo()
 	token := os.Getenv("BOT_TOKEN")
 	if token == "" {
 		log.Fatal("BOT_TOKEN is not set in the environment")
